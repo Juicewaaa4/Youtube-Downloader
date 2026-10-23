@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { readFile, unlink, mkdtemp, readdir, rm } from 'fs/promises';
+import { mkdtemp, readdir, rm, stat } from 'fs/promises';
+import { createReadStream } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -29,16 +30,47 @@ export async function GET(request) {
     await run('yt-dlp', [...args, '--no-playlist', url], { timeout: 300000 });
 
     const [file] = await readdir(dir);
+    if (!file) {
+      throw new Error('No downloaded file found.');
+    }
+
     const filePath = path.join(dir, file);
-    const data = await readFile(filePath);
+    const fileStat = await stat(filePath);
 
-    // Cleanup temp dir (file + directory)
-    await rm(dir, { recursive: true, force: true });
+    const nodeStream = createReadStream(filePath);
+    let cleanedUp = false;
 
-    return new Response(data, {
+    const cleanup = async () => {
+      if (!cleanedUp) {
+        cleanedUp = true;
+        await rm(dir, { recursive: true, force: true }).catch(() => {});
+      }
+    };
+
+    const webStream = new ReadableStream({
+      start(controller) {
+        nodeStream.on('data', (chunk) => {
+          controller.enqueue(chunk);
+        });
+        nodeStream.on('end', () => {
+          controller.close();
+          cleanup();
+        });
+        nodeStream.on('error', (err) => {
+          controller.error(err);
+          cleanup();
+        });
+      },
+      cancel() {
+        nodeStream.destroy();
+        cleanup();
+      },
+    });
+
+    return new Response(webStream, {
       headers: {
         'Content-Type': type === 'audio' ? 'audio/mpeg' : 'video/mp4',
-        'Content-Length': String(data.length),
+        'Content-Length': String(fileStat.size),
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(file)}`,
       },
     });
