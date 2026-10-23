@@ -4,6 +4,7 @@ import { mkdtemp, readdir, rm, stat } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
+import { getYtDlpBaseArgs } from '@/lib/ytdlp';
 
 export const runtime = 'nodejs';
 const run = promisify(execFile);
@@ -27,7 +28,8 @@ export async function GET(request) {
          '-o', path.join(dir, '%(title)s.%(ext)s')];
 
   try {
-    await run('yt-dlp', [...args, '--no-playlist', url], { timeout: 300000 });
+    const baseArgs = await getYtDlpBaseArgs();
+    await run('yt-dlp', [...baseArgs, ...args, '--no-playlist', url], { timeout: 300000 });
 
     const [file] = await readdir(dir);
     if (!file) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { getYtDlpBaseArgs } from '@/lib/ytdlp';
 
 export const runtime = 'nodejs';
 const run = promisify(execFile);
@@ -14,9 +15,15 @@ export async function GET(request) {
   }
 
   try {
+    const baseArgs = await getYtDlpBaseArgs();
     const { stdout } = await run(
       'yt-dlp',
-      ['--print', '%(title)s\n%(thumbnail)s\n%(formats_table)s', '--no-playlist', url],
+      [
+        ...baseArgs,
+        '--print', '%(title)s\n%(thumbnail)s\n%(formats_table)s',
+        '--no-playlist',
+        url,
+      ],
       { timeout: 30000 }
     );
 
