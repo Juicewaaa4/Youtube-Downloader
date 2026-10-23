@@ -9,14 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "autoprefixer": "^10.6.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
-    "tailwindcss": "^4"
+    "postcss": "^8.5.29",
+    "tailwindcss": "^4.3.3"
   }
 }
