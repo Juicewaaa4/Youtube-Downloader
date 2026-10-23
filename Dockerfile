@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libcairo2 \
     curl \
+    unzip \
     ca-certificates \
     xdg-utils \
  && rm -rf /var/lib/apt/lists/*
