@@ -1,39 +1,64 @@
-# Use official Node.js 20 Debian Bookworm slim image
+# ── Stage 1: Build Next.js ──
+FROM node:20-bookworm-slim AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci || npm install
+COPY . .
+RUN npm run build
+
+# ── Stage 2: Production ──
 FROM node:20-bookworm-slim
 
-# Install system dependencies: ffmpeg, python3, curl, ca-certificates
+# Install system deps: ffmpeg, python3, pip, chromium, deno, and libs for headless browser
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
+    python3-pip \
+    python3-venv \
+    chromium \
+    fonts-liberation \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
     curl \
     ca-certificates \
+    xdg-utils \
  && rm -rf /var/lib/apt/lists/*
 
-# Install the latest standalone yt-dlp binary
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
- && chmod a+rx /usr/local/bin/yt-dlp
+# Install deno (yt-dlp recommended JS runtime)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
 
-# Set working directory
+# Install yt-dlp + PO Token plugin via pip (using --break-system-packages since this is a container)
+RUN pip3 install --no-cache-dir --break-system-packages -U yt-dlp yt-dlp-getpot-wpc
+
+# Set chromium path for the getpot-wpc plugin (nodriver)
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMIUM_FLAGS="--no-sandbox --disable-gpu --headless"
+
 WORKDIR /app
 
-# Copy package dependency definitions
-COPY package*.json ./
+# Copy built app from builder stage
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/lib ./lib
 
-# Install npm dependencies
-RUN npm ci || npm install
-
-# Copy source code
-COPY . .
-
-# Build the Next.js application
-RUN npm run build
-
-# Configure runtime environment variables
+# Runtime config
 ENV NODE_ENV=production
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
 EXPOSE 3000
 
-# Start Next.js in production mode
 CMD ["npm", "start"]
